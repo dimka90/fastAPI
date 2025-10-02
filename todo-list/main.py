@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from datetime  import datetime
-from typing import List, Optional
+from fastapi.security import OAuth2PasswordBearer
+from typing import List, Optional, Annotated
 app=FastAPI()
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 next_id = 1
 
 class TaskRequest(BaseModel):
@@ -48,6 +50,11 @@ def find_task_by_title(title: str ) -> TaskResponse| None:
 def get_current_time() -> datetime:
    return datetime.utcnow()
 
+
+@app.get("/tasks")
+def get_all_task():
+   return tasks_db
+
 @app.get("/tasks/{next_id}")
 def get_task(next_id: int):
    task = find_task_by_id(next_id)
@@ -59,10 +66,6 @@ def get_task(next_id: int):
    return  task
 
 
-@app.get("/tasks")
-def get_task():
-   return tasks_db
-
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskRequest):
    global next_id
@@ -72,7 +75,7 @@ def create_task(task: TaskRequest):
       id=next_id,
       title= task.title,
       description= task.description,
-      is_completed=False,
+      is_completed=True,
       created_at= datetime.utcnow(),
       updated_at=datetime.utcnow()
    )
@@ -120,3 +123,40 @@ def update_a_task(next_id: int, new_task: TaskUpdate) -> TaskResponse:
       task_to_update.description = new_task.description
 
    return task_to_update
+
+# filtering
+
+# @app.get("/tasks", response_model= List[TaskResponse])
+# def get_filter_tasks(completed: Optional[bool] = None):
+#    if completed is None:
+#       raise HTTPException(
+#          status_code=status.HTTP_400_BAD_REQUEST,
+#          detail="All fields are required"
+#       )
+#    completed_tasks = [ task for task in tasks_db if task.is_completed == completed]
+#    if completed_tasks:
+#       return completed_tasks
+#    else:
+#       return  []
+   
+@app.get("/tasks", response_model=List[TaskResponse])
+def get_tasks(completed: Optional[bool] = None):
+    print(f"🔍 DEBUG: completed parameter = {completed}")
+    print(f"🔍 DEBUG: Total tasks in db = {len(tasks_db)}")
+    
+    if completed is None:
+        print("🔍 DEBUG: Returning ALL tasks")
+        return tasks_db
+    
+    filtered = [task for task in tasks_db if task.is_completed == completed]
+    print(f"🔍 DEBUG: Filtered tasks count = {len(filtered)}")
+    print(f"🔍 DEBUG: Looking for is_completed = {completed}")
+    
+    for task in tasks_db:
+        print(f"  - Task {task.id}: is_completed = {task.is_completed}")
+    
+    return filtered
+
+@app.get("/tasks_auth")
+def authenticated_route(token: Annotated[str, Depends(oauth2_scheme)]):
+   return token
