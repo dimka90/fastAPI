@@ -233,5 +233,13 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
          "acces_token": user.username,
          "token_type": "bearer"
       }
-   # validate user Password
+   
+@app.get("/users", status_code=200, response_model=List[UserResponse])
+def get_all():
+   all_users = {}
+   if not users_db:
+      return []
+   all_users = [ user for _, user in users_db.items()]
+   return all_users
+   
 
