@@ -1,13 +1,41 @@
 from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from datetime  import datetime
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional, Annotated
 app=FastAPI()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 next_id = 1
 
+
+
+class UserRequest(BaseModel):
+   username: str
+   password: str
+
+class UserResponse(BaseModel):
+   id: int
+   username: str
+   is_active: bool
+   created_at: datetime
+   updated_at: datetime
+
+class UserInDb(UserResponse):
+   password: str
+
+
+def get_user(user_name: str) -> UserResponse | None:
+   user= users_db[user_name]
+   if not user:
+      return None
+   return user
+
+def validate_password(user: UserRequest, password: str) -> bool:
+   user_password = user.password
+   if user_password == password:
+      return True
+   return False
 class TaskRequest(BaseModel):
    title: str
    description: str | None
@@ -24,6 +52,8 @@ class  TaskUpdate(BaseModel):
    title: Optional[str] = None
    description: Optional[str] =None
 
+users_db : dict[str, UserRequest] = {}
+users_task_db: dict[int, TaskResponse] = {}
 tasks_db : List[TaskResponse]= []
 # POST   /tasks              - Create new task
 # GET    /tasks              - Get all tasks
@@ -51,6 +81,14 @@ def get_current_time() -> datetime:
    return datetime.utcnow()
 
 
+def fake_decode_token(token):
+   return TaskRequest(
+      title= "Encoded" + token,
+      description=" oauth2" + token
+   )
+
+def get_task_auth(token: Annotated[str, Depends(oauth2_scheme)]):
+   return fake_decode_token(token)
 @app.get("/tasks")
 def get_all_task():
    return tasks_db
@@ -66,6 +104,23 @@ def get_task(next_id: int):
    return  task
 
 
+@app.post("/users", response_model=UserResponse, status_code=201)
+def create_task(user: UserRequest):
+   global next_id
+   # to_do() -> validation 
+   
+   new_user = UserInDb(
+      id= next_id,
+      username=user.username,
+      is_active=True,
+      password = user.password,
+      created_at= datetime.utcnow(),
+      updated_at=datetime.utcnow()
+   )
+   next_id += 1
+   users_db[user.username] = new_user
+
+   return  new_user
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskRequest):
    global next_id
@@ -157,6 +212,26 @@ def get_tasks(completed: Optional[bool] = None):
     
     return filtered
 
+
 @app.get("/tasks_auth")
-def authenticated_route(token: Annotated[str, Depends(oauth2_scheme)]):
-   return token
+def authenticated_route(token: Annotated[str, Depends(get_task_auth)]):
+   task_response =  fake_decode_token(token)
+   return task_response
+
+@app.post("/token")
+def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+   username= form_data.username
+   user = get_user(username)
+   if not user:
+      raise HTTPException(
+         status_code=status.HTTP_400_BAD_REQUEST, detail = "User not found"
+      )
+   user_password = form_data.password
+   is_password_valid = validate_password(user, user_password)
+   if is_password_valid:
+      return {
+         "acces_token": user.username,
+         "token_type": "bearer"
+      }
+   # validate user Password
+
