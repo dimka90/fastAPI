@@ -10,13 +10,12 @@ import jwt
 from pwdlib import PasswordHash
 load_dotenv()
 app = FastAPI()
-
-"
-ALGORITHM="HS256"
-ACCESS_TOKEN_EXPIRATION_MINUTES = 30
+SECRET_KEY=os.getenv("SECRET_KEY")
+ALGORITHM=os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRATION_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRATION_MINUTES")
+load_dotenv()
 oauth2_scheme = OAuth2PasswordBearer("token")
 user_next_id = 1
-
 password_hashed = PasswordHash.recommended()
 
 
@@ -128,7 +127,7 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     # ToDo
     access_token = generate_access_token( data= {
         "sub": user.username,
-    }, expiry_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRATION_MINUTES))
+    }, expiry_delta=timedelta(minutes=int(ACCESS_TOKEN_EXPIRATION_MINUTES)))
 
     return {
         "access-token": access_token,
