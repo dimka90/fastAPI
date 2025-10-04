@@ -19,6 +19,13 @@ user_next_id = 1
 password_hashed = PasswordHash.recommended()
 
 
+class InvalidJwtToken(HTTPException):
+    def __init__(self, status_code, detail = None, headers = None):
+        super().__init__(
+            status_code = status_code,
+            detail=detail
+            )
+
 print(password_hashed)
 def generate_next_id():
     return user_next_id 
@@ -77,6 +84,23 @@ def generate_access_token( data: dict, expiry_delta: timedelta | None = None) ->
 
     return encode_jwt
 
+
+def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> HTTPException | UserResponse:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    user = payload.get("sub")
+    if not user:
+        raise InvalidJwtToken(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    active_user= find_user_by_username( user)
+    if not active_user:
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "User not found"
+        )
+    return active_user
+
 @app.post("/api/users/", status_code=status.HTTP_201_CREATED)
 def create_user(user: UserResquest) -> UserResponse:
     global user_next_id
@@ -107,7 +131,10 @@ def create_user(user: UserResquest) -> UserResponse:
     
     return user_response
 
-@app.post("/api/token")
+
+
+
+@app.post("/token")
 def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user_name = form_data.username
     user = find_user_by_username( user_name)
@@ -130,7 +157,10 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     }, expiry_delta=timedelta(minutes=int(ACCESS_TOKEN_EXPIRATION_MINUTES)))
 
     return {
-        "access-token": access_token,
+        "access_token": access_token,
         "token-type": "bearer"
     }
 
+@app.get("/api/user")
+def get_user(user: Annotated[UserResponse | HTTPException, Depends(get_current_user)]):
+    return user
