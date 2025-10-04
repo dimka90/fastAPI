@@ -15,6 +15,7 @@ def generate_next_id():
 def hashed_password(password: str) -> str:
     return f"{password}+abc*"
 
+
 class UserResquest(BaseModel):
     username: str
     password: str
@@ -30,6 +31,17 @@ class UserInDB(UserResponse):
 
 user_db: List[UserInDB] = []
 
+def find_user_by_username( username: str) -> UserResponse  | None:
+    for user in user_db:
+        if user.username == username:
+            return user
+    return None
+
+def check_password_match(user: UserInDB, password) ->bool:
+    pwd_in_db = user.hashed_password
+    if  pwd_in_db == password:
+        return True
+    return False
 @app.get("/api/home")
 def index():
     return{
@@ -68,4 +80,22 @@ def create_user(user: UserResquest) -> UserResponse:
 
 @app.post("/token")
 def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    
+    user_name = form_data.username
+    user = find_user_by_username( user_name)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="user does not exist"
+        )
+    user_password = form_data.password
+    checked_user_password = check_password_match(user, user_password)
+    if  not checked_user_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect Password"
+        )
+    # ToDo
+    return {
+        "access-token": user.username,
+        "token-type": "bearer"
+    }
