@@ -1,10 +1,11 @@
 from sqlmodel import SQLModel, Field
+from pydantic import BaseModel
 from typing import Optional
-class Post(SQLModel, table = True):
-    id: int
+from datetime import datetime
+class Post(BaseModel):
     title: str 
     content: str
-    image: Optional[None] = None
+    image: Optional[str] = None
     author_id: int
-
-
+    created_at: datetime
+    updated_at: datetime
