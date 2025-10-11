@@ -1,5 +1,5 @@
 from fastapi import Depends, FastAPI, status, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, APIKeyHeader
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 from typing import List, Annotated
@@ -15,6 +15,7 @@ ALGORITHM=os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRATION_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRATION_MINUTES")
 load_dotenv()
 oauth2_scheme = OAuth2PasswordBearer("token")
+oauth2_scheme = APIKeyHeader(name="Authorization")
 user_next_id = 1
 password_hashed = PasswordHash.recommended()
 

@@ -87,6 +87,14 @@ def fake_decode_token(token):
       description=" oauth2" + token
    )
 
+def get_user_token(token: Annotated[str, Depends(oauth2_scheme)]) -> UserResponse | None:
+   user = fake_decode_token(token)
+   return user
+
+
+def fake_decode_token(token: str) -> UserResponse  | None:
+   user = users_db.get(token)
+   return user
 def get_task_auth(token: Annotated[str, Depends(oauth2_scheme)]):
    return fake_decode_token(token)
 @app.get("/tasks")
@@ -235,11 +243,24 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
       }
    
 @app.get("/users", status_code=200, response_model=List[UserResponse])
-def get_all():
+def get_all( ):
    all_users = {}
    if not users_db:
       return []
    all_users = [ user for _, user in users_db.items()]
    return all_users
+
+@app.get("/user", status_code=200, response_model=UserResponse)
+def get_current_user( user: Annotated[UserResponse, Depends(get_user)]):
    
+   if not user:
+      raise HTTPException(
+         status_code=status.HTTP_401_UNAUTHORIZED,
+         detail = "You are not allowed to access this page"
+
+      )
+  
+   return user
+
+
 

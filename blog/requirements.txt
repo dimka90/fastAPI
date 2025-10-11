@@ -1,1 +1,3 @@
-fastapi[standard]
+fastapi[standaard]
+sqlmodel
+uvicorn
