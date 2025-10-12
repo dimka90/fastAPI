@@ -1,13 +1,26 @@
 from sqlmodel import SQLModel
 from enum import Enum
-class Role(str, Enum):
-    Admin=str
-    Reader= str
-    Author=str
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
 
-class User(SQLModel):
-    id: int
+
+class Role(str, Enum):
+    ADMIN="admin"
+    READER= "reader"
+    AUTHOR= "author"
+
+class User(BaseModel):
     email: str
-    Role: Role
+    role: Optional[Role] = Role.AUTHOR
+
+class UserRequest(User):
     password: str
-    
+
+class UserInDb(UserRequest):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+class UserResponse(User):
+    created_at: datetime
+    updated_at: datetime
