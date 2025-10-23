@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from app.models.post import Post
+from app.models.post import Post,PostInDb
 from app.models.user import UserInDb
 from typing import Dict, List
 @dataclass
@@ -18,13 +18,13 @@ class DataBase:
     
     def get_user(self, user_id:int ) -> UserInDb| None:
         return self._users.get(user_id)
-    def add_post(self,user_id:int,  post: Post) ->bool:
+    def add_post(self,user_id:int,  post: PostInDb) ->bool:
         if user_id not in self._users:
             return False
         self._posts.setdefault(user_id, []).append(post)
         return True
     
-    def get_posts(self, id: int) -> List[Post] | None:
+    def get_posts(self, id: int) -> List[PostInDb] | None:
         return self._posts[id]
     
 database_instance = DataBase()

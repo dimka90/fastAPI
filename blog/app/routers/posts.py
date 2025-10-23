@@ -1,11 +1,12 @@
 from fastapi import APIRouter, status, HTTPException
-from ..models.post import Post
+from ..models.post import PostCreate, Post, PostInDb
 from ..database.db import DataBase
 from ..database.db import database_instance
 from typing import List
+from datetime import datetime
 postRouter = APIRouter()
-@postRouter.get("/posts/{user_id}", tags=["posts"], response_model= List[Post], status_code=200)
-def get_posts(user_id: int) -> List[Post] | None:
+@postRouter.get("/posts/{user_id}", tags=["posts"], response_model= List[PostInDb], status_code=200)
+def get_posts(user_id: int) -> List[PostInDb] | None:
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -22,18 +23,24 @@ def get_posts(user_id: int) -> List[Post] | None:
 
     
 # create Post
-@postRouter.post("/posts", tags=["past"], response_model= Post, status_code=201 )
-def create_post(user_id: int,  post: Post):
+@postRouter.post("/posts", tags=["past"], response_model= PostInDb, status_code=201 )
+def create_post(user_id: int,  post: PostCreate):
     # Validation
     if not post.author_id or  not post.title:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error: Fields can not be empty"
         )
-    commit = database_instance.add_post(user_id = user_id, post=post)
+    post_in_db = PostInDb(
+        **post.model_dump(),
+        created_at=datetime.utcnow(),
+        updated_at = datetime.utcnow()
+    )
+    commit = database_instance.add_post(user_id = user_id, post=post_in_db)
     if not commit:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User with such  Id does not exist"
         )
-    return  post
+    return  post_in_db
+
