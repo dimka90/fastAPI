@@ -34,7 +34,8 @@ def create_post(user_id: int,  post: PostCreate):
     post_in_db = PostInDb(
         **post.model_dump(),
         created_at=datetime.utcnow(),
-        updated_at = datetime.utcnow()
+        updated_at = datetime.utcnow(),
+        id=database_instance.post_id()
     )
     commit = database_instance.add_post(user_id = user_id, post=post_in_db)
     if not commit:

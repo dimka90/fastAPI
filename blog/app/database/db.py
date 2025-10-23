@@ -6,7 +6,7 @@ from typing import Dict, List
 class DataBase:
     _users: Dict[int, UserInDb] = field(default_factory=dict)
     _posts: Dict[int, List[Post]] = field(default_factory=dict)
-
+    _id = 0
     def add_user(self, user: UserInDb) -> UserInDb | bool:
         user_exit = self.get_user(user.id)
         if  user_exit:
@@ -26,5 +26,7 @@ class DataBase:
     
     def get_posts(self, id: int) -> List[PostInDb] | None:
         return self._posts[id]
-    
+    def post_id(self)-> int:
+        self._id += 1
+        return self._id
 database_instance = DataBase()
