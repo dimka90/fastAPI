@@ -15,12 +15,12 @@ def create_user(id: int, user: UserRequest) -> UserResponse:
     user_exit = database_instance.get_user(id)
     if  user_exit:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="User already exist"
         )
     
     new_user = UserInDb(**user.dict(),
-                        id=1,
+                        id=id,
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow()
     )
@@ -28,3 +28,6 @@ def create_user(id: int, user: UserRequest) -> UserResponse:
     if is_user_create:
         return is_user_create
     
+# sudo lsof -i -P -n | grep LISTEN
+#sudo ufw allow 8000
+

@@ -33,7 +33,7 @@ def create_post(user_id: int,  post: Post):
     commit = database_instance.add_post(user_id = user_id, post=post)
     if not commit:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An Error Occured while adding user post"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User with such  Id does not exist"
         )
     return  post
