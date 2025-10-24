@@ -15,10 +15,10 @@ class PostInDb(PostCreate):
     updated_at: datetime
 
 class PostUpdate(BaseModel):
-      title: Optional[str]
-      content:Optional[str]
-      image: Optional[str]
-      author_id: Optional[str]
-      updated_at: Optional[datetime]
+      id:int
+      title: Optional[str] = None
+      content:Optional[str] = None
+      image: Optional[str] = None
+      updated_at: Optional[datetime] = None
 
 

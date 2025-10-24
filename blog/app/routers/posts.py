@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, HTTPException
-from ..models.post import PostCreate, Post, PostInDb
+from ..models.post import PostCreate, PostUpdate, PostInDb
 from ..database.db import DataBase
 from ..database.db import database_instance
 from typing import List
@@ -45,3 +45,28 @@ def create_post(user_id: int,  post: PostCreate):
         )
     return  post_in_db
 
+@postRouter.patch("/posts/")
+def update_post(post: PostUpdate, author_id: int):
+    if not post.id or not author_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Post id and Authors Id are required"
+        )
+    # find user
+    user_post = database_instance.get_user(author_id)
+    if not user_post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not Exist"
+        )
+    user_posts= database_instance.get_posts(author_id)
+    # Call the function to get the post
+    post_to_update = database_instance.update_post(user_posts, post.id, post.model_dump(exclude_unset=True))
+    if  not post_to_update:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post with such Id does not exist"
+        )
+    
+    return post_to_update
+    # get user id

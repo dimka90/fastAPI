@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from app.models.post import Post,PostInDb
+from app.models.post import Post,PostInDb, PostUpdate
 from app.models.user import UserInDb
-from typing import Dict, List
+from typing import Dict, List, Optional
+from datetime import datetime
 @dataclass
 class DataBase:
     _users: Dict[int, UserInDb] = field(default_factory=dict)
@@ -25,8 +26,18 @@ class DataBase:
         return True
     
     def get_posts(self, id: int) -> List[PostInDb] | None:
-        return self._posts[id]
+        return self._posts.get(id, [])
     def post_id(self)-> int:
         self._id += 1
         return self._id
+    def update_post(self,posts: List[PostInDb], post_id: int, filter_post: PostUpdate) -> PostInDb | None:
+        for i, post in enumerate(posts):
+            if post.id == post_id:
+                current_data = post.model_dump()
+                current_data.update(filter_post)
+                updated_post = PostInDb(**current_data)
+                updated_post.updated_at=datetime.utcnow()
+                posts[i]=updated_post
+                return  updated_post
+        return None
 database_instance = DataBase()
