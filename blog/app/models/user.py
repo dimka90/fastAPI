@@ -17,7 +17,8 @@ class User(BaseModel):
 class UserRequest(User):
     password: str
 
-class UserInDb(UserRequest):
+class UserInDb(User):
+    hashed_password: str
     id: int
     created_at: datetime
     updated_at: datetime

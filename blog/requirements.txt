@@ -1,3 +1,4 @@
 fastapi[standaard]
 sqlmodel
 uvicorn
+pwdlib[argon2]
