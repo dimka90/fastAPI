@@ -1,266 +1,193 @@
-from fastapi import FastAPI, HTTPException, status, Depends
-from pydantic import BaseModel, Field
-from datetime  import datetime
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from typing import List, Optional, Annotated
-app=FastAPI()
+from fastapi import FastAPI, status, HTTPException
+from pydantic import BaseModel
+from datetime import datetime
+from typing import List, Optional, Dict
+from pprint import pprint
+app = FastAPI(title="Todo list")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-next_id = 1
+class User(BaseModel):
+    username: str
+class UserCreate(User):
+    password: str
+class UserInDb(UserCreate):
+    created_at: datetime
+    updated_at: datetime
 
+class UserResponse(User):
+    created_at: datetime
+    updated_at: datetime
 
+class TaskCreate(BaseModel):
+    title: str
+    description: str
 
-class UserRequest(BaseModel):
-   username: str
-   password: str
+class TaskinDb(TaskCreate):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    is_completed: bool 
 
-class UserResponse(BaseModel):
-   id: int
-   username: str
-   is_active: bool
-   created_at: datetime
-   updated_at: datetime
+class TaskUpdate(BaseModel):
+    id: int
+    title: Optional[str] = None
+    description: Optional[str] = None
 
-class UserInDb(UserResponse):
-   password: str
+class Database:
+    def __init__(self):
+        self._users: Dict[int,UserInDb] = {}
+        self._task:Dict[int, List[TaskinDb]]= {}
+        self.id_task= 1
+        self.user_id = 1
+    def add_task(self, user_id:int, task:TaskinDb):
+        self._task.setdefault(user_id, []).append(task)
+    
+    def get_tasks(self):
+        return self._task
+    def increment_id_task(self):
+        self.id_task+= 1
+    def increment_id_user(self): 
+        self.user_id += 1
 
+    def add_user(self, user: UserInDb) -> UserInDb | None:
+        for _, user_details in self._users.items():
+            if user_details.username == user.username:
+                return None
+        user_id= self.user_id
+        self._users[user_id] = user
+        self.increment_id_user()
+        return user
+    
+    def get_all_users(self):
+        return self._users
+    
+    def check_user(self, user_id:int):
+        if not user_id in self._users:
+            return None
+        return user_id
+    
+        
+        
+db_instance = Database()
 
-def get_user(user_name: str) -> UserResponse | None:
-   user= users_db[user_name]
-   if not user:
-      return None
-   return user
+# Endpoints
 
-def validate_password(user: UserRequest, password: str) -> bool:
-   user_password = user.password
-   if user_password == password:
-      return True
-   return False
-class TaskRequest(BaseModel):
-   title: str
-   description: str | None
+@app.get("/")
+def index():
+    return{
+        "message": "Todo App"
+    }
 
-class TaskResponse(BaseModel):
-   id: int
-   title: str
-   description: str | None
-   is_completed:  bool = False
-   created_at: datetime
-   updated_at: datetime
+@app.post("/tasks", status_code=status.HTTP_201_CREATED)
+def create_task(task: TaskCreate, user_id: int):
+    if not task.title or not task.description:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="All fields are required"
+        )
+    user_id = db_instance.check_user(user_id)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not exist"
+        )
+    
 
-class  TaskUpdate(BaseModel):
-   title: Optional[str] = None
-   description: Optional[str] =None
+    new_task = TaskinDb(
+        title=task.title,
+        description= task.description,
+        id =db_instance.id_task,
+        created_at= datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        is_completed=False
+    )
+    db_instance.increment_id_task()
+    db_instance.add_task(user_id=user_id, task=new_task)
 
-users_db : dict[str, UserRequest] = {}
-users_task_db: dict[int, TaskResponse] = {}
-tasks_db : List[TaskResponse]= []
-# POST   /tasks              - Create new task
-# GET    /tasks              - Get all tasks
-# GET    /tasks/{next_id}    - Get specific task
-# PUT    /tasks/{next_id}    - Update task
-# DELETE /tasks/{next_id}    - Delete task
-# PATCH  /tasks/{next_id}/complete - Toggle completion
+    return {
+        "success": True,
+        "data": new_task,
+        "message": "Task created successfully"
+    }
 
-
-def find_task_by_id(id: int) -> TaskResponse| None:
-   if len(tasks_db) < 0:
-      return None
-   for task in tasks_db:
-      if task.id == id:
-         return task
-   return None
-
-def find_task_by_title(title: str ) -> TaskResponse| None:
-   for task in tasks_db:
-      if task.title == title:
-         return task
-   return None
-
-def get_current_time() -> datetime:
-   return datetime.utcnow()
-
-
-def fake_decode_token(token):
-   return TaskRequest(
-      title= "Encoded" + token,
-      description=" oauth2" + token
-   )
-
-def get_user_token(token: Annotated[str, Depends(oauth2_scheme)]) -> UserResponse | None:
-   user = fake_decode_token(token)
-   return user
-
-
-def fake_decode_token(token: str) -> UserResponse  | None:
-   user = users_db.get(token)
-   return user
-def get_task_auth(token: Annotated[str, Depends(oauth2_scheme)]):
-   return fake_decode_token(token)
+@app.get("/tasks")
+def get_user_tasks(id:int ):
+    user_id = db_instance.check_user(id)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not exist"
+        )
+    user_tasks= None
+    for id_in_db, user_task in db_instance._task.items():
+        if id_in_db == id:
+            user_tasks = user_task
+    return {
+        "data": user_tasks,
+         "message": "All User tasks retrived successfully"
+    }
 @app.get("/tasks")
 def get_all_task():
-   return tasks_db
+   tasks =  db_instance.get_tasks()
+   return{
+       "success": True,
+       "data": tasks,
+       "message": "All tasks retrived successfully"
+   }
 
-@app.get("/tasks/{next_id}")
-def get_task(next_id: int):
-   task = find_task_by_id(next_id)
-   if task is None:
-      raise HTTPException(
-         status_code=status.HTTP_404_NOT_FOUND,
-         detail= "Invalid Id"
-         )
-   return  task
+@app.patch("/tasks/")
+def partial_update(task: TaskUpdate):
+    # todo
+    if not task.title and not task.description:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Atleast One field is required"
+        )
+    value_to_update = None
+    flag = False
+    if task.title:
+        value_to_update = task.title
+        flag=True
+    else:
+        value_to_update = task.description
+    for  task_in_db in range(len(db_instance._task)):
+        if db_instance._task[task_in_db].id == task.id:
+            if flag:
+                db_instance._task[task_in_db].description = value_to_update
+            else:
+                db_instance._task[task_in_db].title = value_to_update
 
+#============================
+# User endpoints
 
-@app.post("/users", response_model=UserResponse, status_code=201)
-def create_task(user: UserRequest):
-   global next_id
-   # to_do() -> validation 
+@app.post("/users")
+def register_user(user: UserCreate):
+    if not  user.username or  not user.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="All Fields are required"
+        )
+    new_user = UserInDb(
+        **user.model_dump(),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()                   
+    )
+    user = db_instance.add_user(new_user)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already exist"
+            )
+    return {
+        "success": True,
+        "data": UserResponse(**user.model_dump(exclude_unset=True)),
+        "message": "User created Successfully"
+    }
    
-   new_user = UserInDb(
-      id= next_id,
-      username=user.username,
-      is_active=True,
-      password = user.password,
-      created_at= datetime.utcnow(),
-      updated_at=datetime.utcnow()
-   )
-   next_id += 1
-   users_db[user.username] = new_user
-
-   return  new_user
-@app.post("/tasks", status_code=201)
-def create_task(task: TaskRequest):
-   global next_id
-   # to_do() -> validation 
-   
-   new_task = TaskResponse(
-      id=next_id,
-      title= task.title,
-      description= task.description,
-      is_completed=True,
-      created_at= datetime.utcnow(),
-      updated_at=datetime.utcnow()
-   )
-   next_id += 1
-   tasks_db.append(new_task)
-
-   return  new_task
-
-@app.delete("/tasks/{next_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(next_id: int):
-   task = find_task_by_id(next_id)
-   if task is None:
-      raise HTTPException(
-         status_code=status.HTTP_404_NOT_FOUND,
-         detail="Invalid Id"
-      )
-   tasks_db.remove(task)
-   return None
-   
-@app.put("/tasks/{next_id}", status_code=status.HTTP_206_PARTIAL_CONTENT)
-def update_a_task(next_id: int, new_task: TaskUpdate) -> TaskResponse:
-   task = find_task_by_id(next_id)
-   if task is None:
-      raise HTTPException(
-         status_code=status.HTTP_404_NOT_FOUND,
-         detail=" Invalid Id"
-      )
-   task.title = new_task.title
-   task.description = new_task.description
-   task.updated_at = get_current_time()
-   return task
-
-@app.patch("/tasks/{next_id}", status_code=status.HTTP_206_PARTIAL_CONTENT)
-def update_a_task(next_id: int, new_task: TaskUpdate) -> TaskResponse:
-   
-   task_to_update = find_task_by_id(next_id)
-   if task_to_update is None:
-      raise HTTPException(
-         status_code=status.HTTP_404_NOT_FOUND,
-         detail=" Invalid Id"
-      )
-   if new_task.title is not None:
-      task_to_update.title = new_task.title
-   if new_task.description is not None:
-      task_to_update.description = new_task.description
-
-   return task_to_update
-
-# filtering
-
-# @app.get("/tasks", response_model= List[TaskResponse])
-# def get_filter_tasks(completed: Optional[bool] = None):
-#    if completed is None:
-#       raise HTTPException(
-#          status_code=status.HTTP_400_BAD_REQUEST,
-#          detail="All fields are required"
-#       )
-#    completed_tasks = [ task for task in tasks_db if task.is_completed == completed]
-#    if completed_tasks:
-#       return completed_tasks
-#    else:
-#       return  []
-   
-@app.get("/tasks", response_model=List[TaskResponse])
-def get_tasks(completed: Optional[bool] = None):
-    print(f"🔍 DEBUG: completed parameter = {completed}")
-    print(f"🔍 DEBUG: Total tasks in db = {len(tasks_db)}")
-    
-    if completed is None:
-        print("🔍 DEBUG: Returning ALL tasks")
-        return tasks_db
-    
-    filtered = [task for task in tasks_db if task.is_completed == completed]
-    print(f"🔍 DEBUG: Filtered tasks count = {len(filtered)}")
-    print(f"🔍 DEBUG: Looking for is_completed = {completed}")
-    
-    for task in tasks_db:
-        print(f"  - Task {task.id}: is_completed = {task.is_completed}")
-    
-    return filtered
-
-
-@app.get("/tasks_auth")
-def authenticated_route(token: Annotated[str, Depends(get_task_auth)]):
-   task_response =  fake_decode_token(token)
-   return task_response
-
-@app.post("/token")
-def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-   username= form_data.username
-   user = get_user(username)
-   if not user:
-      raise HTTPException(
-         status_code=status.HTTP_400_BAD_REQUEST, detail = "User not found"
-      )
-   user_password = form_data.password
-   is_password_valid = validate_password(user, user_password)
-   if is_password_valid:
-      return {
-         "acces_token": user.username,
-         "token_type": "bearer"
-      }
-   
-@app.get("/users", status_code=200, response_model=List[UserResponse])
-def get_all( ):
-   all_users = {}
-   if not users_db:
-      return []
-   all_users = [ user for _, user in users_db.items()]
-   return all_users
-
-@app.get("/user", status_code=200, response_model=UserResponse)
-def get_current_user( user: Annotated[UserResponse, Depends(get_user)]):
-   
-   if not user:
-      raise HTTPException(
-         status_code=status.HTTP_401_UNAUTHORIZED,
-         detail = "You are not allowed to access this page"
-
-      )
-  
-   return user
-
-
-
+@app.get("/users")
+def get_users():
+    users = db_instance.get_all_users()
+    return {
+        "success": True,
+        "data": users,
+        "message": "All Users retrived  Successfully"
+    }
