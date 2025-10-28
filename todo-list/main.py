@@ -2,7 +2,6 @@ from fastapi import FastAPI, status, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional, Dict
-from pprint import pprint
 app = FastAPI(title="Todo list")
 
 class User(BaseModel):
@@ -28,7 +27,6 @@ class TaskinDb(TaskCreate):
     is_completed: bool 
 
 class TaskUpdate(BaseModel):
-    id: int
     title: Optional[str] = None
     description: Optional[str] = None
 
@@ -43,6 +41,16 @@ class Database:
     
     def get_tasks(self):
         return self._task
+    def update_task(self, task_id: int, user_tasks: List[TaskinDb], task_to_update):
+        for index, task in enumerate(user_tasks):
+            if task.id == task_id:
+                task_update = task.model_dump()
+                task_update.update(task_to_update)
+                task.updated_at = datetime.utcnow()
+                task_to_store = TaskinDb(**task_update)
+                user_tasks[index] = task_to_store
+                break
+        return user_tasks
     def increment_id_task(self):
         self.id_task+= 1
     def increment_id_user(self): 
@@ -60,12 +68,22 @@ class Database:
     def get_all_users(self):
         return self._users
     
-    def check_user(self, user_id:int):
+    def check_user_exist(self, user_id:int):
         if not user_id in self._users:
             return None
         return user_id
+    def get_all_user_tasks(self, user_id: int) -> List[TaskinDb]:
+        user_tasks = None
+        for id_in_db, user_task in self._task.items():
+            if id_in_db == user_id:
+                user_tasks = user_task
+                break
+        return user_tasks
     
-        
+class USERNOTFOUNDERROR(HTTPException):
+    def __init__(self, status_code=status.HTTP_404_NOT_FOUND, detail = "User not found", headers = None):
+        super().__init__(status_code, detail, headers)
+        pass
         
 db_instance = Database()
 
@@ -84,7 +102,7 @@ def create_task(task: TaskCreate, user_id: int):
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="All fields are required"
         )
-    user_id = db_instance.check_user(user_id)
+    user_id = db_instance.check_user_exist(user_id)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -109,23 +127,22 @@ def create_task(task: TaskCreate, user_id: int):
         "message": "Task created successfully"
     }
 
+
 @app.get("/tasks")
 def get_user_tasks(id:int ):
-    user_id = db_instance.check_user(id)
+    user_id = db_instance.check_user_exist(id)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User does not exist"
         )
-    user_tasks= None
-    for id_in_db, user_task in db_instance._task.items():
-        if id_in_db == id:
-            user_tasks = user_task
+    user_tasks = db_instance.get_all_user_tasks(user_id)
     return {
         "data": user_tasks,
          "message": "All User tasks retrived successfully"
     }
-@app.get("/tasks")
+
+@app.get("/tasks/")
 def get_all_task():
    tasks =  db_instance.get_tasks()
    return{
@@ -134,28 +151,32 @@ def get_all_task():
        "message": "All tasks retrived successfully"
    }
 
+
+
 @app.patch("/tasks/")
-def partial_update(task: TaskUpdate):
-    # todo
+def update(task: TaskUpdate, user_id: int, task_id: int):
+    """
+    Update:
+            Partial task update
+    Arg:
+        task: A pydantic model of Task (title or description)
+    Return Type:
+                 HTTPException | Task
+    """
     if not task.title and not task.description:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Atleast One field is required"
         )
-    value_to_update = None
-    flag = False
-    if task.title:
-        value_to_update = task.title
-        flag=True
-    else:
-        value_to_update = task.description
-    for  task_in_db in range(len(db_instance._task)):
-        if db_instance._task[task_in_db].id == task.id:
-            if flag:
-                db_instance._task[task_in_db].description = value_to_update
-            else:
-                db_instance._task[task_in_db].title = value_to_update
-
+    # Check if user exist
+    user_id= db_instance.check_user_exist(user_id)
+    if not user_id:
+        raise USERNOTFOUNDERROR()
+    user_tasks = db_instance.get_all_user_tasks(user_id)
+    filter_task = task.model_dump(exclude_unset=True)
+    tasks = db_instance.update_task(task_id,user_tasks,filter_task)
+    return tasks
+    # todo , check if user has any asks
 #============================
 # User endpoints
 

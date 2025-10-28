@@ -26,7 +26,6 @@ def create_user(id: int, user: UserRequest) -> UserResponse:
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow()
     )
-    print(verify_password("1234",new_user.hashed_password))
     is_user_create = database_instance.add_user( new_user)
     if is_user_create:
         return is_user_create

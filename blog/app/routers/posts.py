@@ -21,7 +21,7 @@ def get_posts(user_id: int) -> List[PostInDb] | None:
         )
     return database_instance._posts[user_id]
 
-    
+
 # create Post
 @postRouter.post("/posts", tags=["past"], response_model= PostInDb, status_code=201 )
 def create_post(user_id: int,  post: PostCreate):
